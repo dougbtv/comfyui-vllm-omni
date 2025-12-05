@@ -1,6 +1,12 @@
 # ComfyUI-vLLM-Omni Text-to-Image Node
 
+> **⚠️ EXPERIMENTAL PROOF-OF-CONCEPT**
+> This is an experimental integration that relies on experimental features in vLLM-Omni. The image generation API in vLLM-Omni is currently under development and may change. Use this for testing and development purposes only.
+
 A custom ComfyUI node that enables text-to-image generation using **vLLM-Omni's diffusion backend**. This integration allows you to use vLLM-Omni's experimental image generation capabilities (e.g., Qwen-Image) directly within ComfyUI workflows.
+
+![Example Generation](example-steampunk-skier.png)
+*Example: "telemark skier in the Adirondacks, 1880s clothing, steampunk goggles, action shot, powder skiing, a portrait by Nick Alm"*
 
 ## Features
 
@@ -15,7 +21,10 @@ A custom ComfyUI node that enables text-to-image generation using **vLLM-Omni's 
 
 - **ComfyUI** installed and running
 - **Python 3.9+**
-- **vLLM-Omni** with image generation server running
+- **vLLM-Omni** with **experimental** image generation server support
+  - ⚠️ Requires vLLM-Omni with the experimental image generation endpoint
+  - The image server implementation is not yet part of the official vLLM-Omni release
+  - See `serverside-implementation.md` for details on the server-side requirements
 - Dependencies (most already included with ComfyUI):
   - `aiohttp>=3.8.0`
   - `torch>=2.0.0`
@@ -36,6 +45,8 @@ pip install -r requirements.txt
 ```
 
 ### Step 2: Start vLLM-Omni Image Server
+
+> **⚠️ EXPERIMENTAL:** The vLLM-Omni image generation server is an experimental feature. The API endpoint may not be available in official vLLM-Omni releases yet. See `serverside-implementation.md` for implementation details.
 
 You need a running vLLM-Omni server with image generation support. Start it with:
 
@@ -266,15 +277,16 @@ Contributions are welcome! Please:
 
 ## Known Limitations
 
-This is a Proof-of-Concept (PoC) implementation with the following limitations:
+This is a **Proof-of-Concept (PoC)** implementation with the following limitations:
 
-1. **Synchronous Generation**: Blocks ComfyUI during generation (normal for most nodes)
-2. **Single Server**: No automatic load balancing or failover
-3. **No Progress Bar**: No real-time progress updates during generation
-4. **Base64 Only**: No direct file URL support (would require image hosting)
-5. **No Authentication**: Assumes open localhost server
+1. **⚠️ Experimental vLLM-Omni API**: Relies on experimental image generation features in vLLM-Omni that are under active development and subject to change
+2. **Async Generation Only**: Requires modern ComfyUI with async node support
+3. **Single Server**: No automatic load balancing or failover
+4. **No Progress Bar**: No real-time progress updates during generation
+5. **Base64 Only**: No direct file URL support (would require image hosting)
+6. **No Authentication**: Assumes open localhost server
 
-These may be addressed in future versions.
+These may be addressed in future versions as vLLM-Omni's image generation capabilities mature.
 
 ## Future Enhancements
 

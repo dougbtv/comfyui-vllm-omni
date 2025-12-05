@@ -1,0 +1,14 @@
+# ComfyUI-vLLM-Omni Dependencies
+# Most of these are already included in standard ComfyUI installations
+
+# Async HTTP client for API communication
+aiohttp>=3.8.0
+
+# PyTorch for tensor operations (usually already installed with ComfyUI)
+torch>=2.0.0
+
+# Image processing library
+pillow>=9.0.0
+
+# Numerical operations
+numpy>=1.21.0

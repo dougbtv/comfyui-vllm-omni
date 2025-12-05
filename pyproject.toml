@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfyui-vllm-omni"
+version = "0.1.0"
+description = "ComfyUI custom node for vLLM-Omni text-to-image generation"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+keywords = ["comfyui", "vllm", "vllm-omni", "diffusion", "text-to-image", "qwen-image"]
+authors = [
+    {name = "ComfyUI-vLLM-Omni Contributors"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "aiohttp>=3.8.0",
+    "torch>=2.0.0",
+    "pillow>=9.0.0",
+    "numpy>=1.21.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/comfyui-vllm-omni"
+Documentation = "https://github.com/yourusername/comfyui-vllm-omni#readme"
+Repository = "https://github.com/yourusername/comfyui-vllm-omni"
+Issues = "https://github.com/yourusername/comfyui-vllm-omni/issues"

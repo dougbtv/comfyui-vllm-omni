@@ -5,7 +5,6 @@ This module provides a custom ComfyUI node that enables image generation
 using vLLM-Omni's diffusion backend via HTTP API.
 """
 
-import asyncio
 import torch
 from typing import Tuple
 
@@ -127,7 +126,7 @@ class VLLMTextToImage:
     CATEGORY = "image/generation/vllm-omni"
     DESCRIPTION = "Generate images using vLLM-Omni's diffusion models (Qwen-Image)"
 
-    def generate(
+    async def generate(
         self,
         prompt: str,
         negative_prompt: str = "",
@@ -142,8 +141,8 @@ class VLLMTextToImage:
         """
         Main execution method - generates images via vLLM-Omni API.
 
-        This is a synchronous wrapper around the async implementation to maintain
-        ComfyUI compatibility.
+        Modern ComfyUI supports async node functions natively, so this method
+        is async and will be awaited by ComfyUI's execution system.
 
         Args:
             prompt: Text prompt for image generation
@@ -162,60 +161,6 @@ class VLLMTextToImage:
         Raises:
             ValueError: If prompt is empty or invalid
             RuntimeError: If generation fails
-        """
-        # Create and run event loop for async execution
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(
-                self._generate_async(
-                    prompt=prompt,
-                    negative_prompt=negative_prompt,
-                    width=width,
-                    height=height,
-                    num_inference_steps=num_inference_steps,
-                    guidance_scale=guidance_scale,
-                    n=n,
-                    seed=seed,
-                    server_url=server_url,
-                )
-            )
-            return result
-        finally:
-            loop.close()
-
-    async def _generate_async(
-        self,
-        prompt: str,
-        negative_prompt: str,
-        width: int,
-        height: int,
-        num_inference_steps: int,
-        guidance_scale: float,
-        n: int,
-        seed: int,
-        server_url: str,
-    ) -> Tuple[torch.Tensor]:
-        """
-        Async implementation of image generation.
-
-        Steps:
-        1. Validate prompt
-        2. Create API client and call vLLM-Omni
-        3. Parse response data[].b64_json fields
-        4. Convert each base64 string to tensor
-        5. Concatenate into batch tensor
-        6. Return as tuple for ComfyUI
-
-        Args:
-            All parameters from generate() method
-
-        Returns:
-            Tuple containing batch tensor
-
-        Raises:
-            ValueError: If prompt is empty
-            RuntimeError: If API call fails or response is invalid
         """
         # Validate prompt
         if not prompt or not prompt.strip():

@@ -79,3 +79,62 @@ def validate_image_tensor(tensor: torch.Tensor) -> None:
         raise ValueError(
             f"Tensor values must be in [0,1], got [{tensor.min():.3f}, {tensor.max():.3f}]"
         )
+
+
+def image_tensor_to_png_bytes(tensor: torch.Tensor, filename: str = "image.png") -> BytesIO:
+    """
+    Convert ComfyUI image tensor to PNG BytesIO for multipart upload.
+
+    This function converts a ComfyUI IMAGE tensor to a PNG-encoded BytesIO object
+    suitable for multipart/form-data upload. The BytesIO object has its .name
+    attribute set, which is required by aiohttp for file uploads.
+
+    Args:
+        tensor: ComfyUI IMAGE tensor with shape (B, H, W, C), dtype float32, range [0, 1]
+        filename: Name attribute to set on BytesIO (default: "image.png")
+
+    Returns:
+        BytesIO object containing PNG-encoded image with .name attribute set
+
+    Raises:
+        ValueError: If tensor format is invalid (not 4D, wrong dtype, etc.)
+    """
+    # Validate tensor is 4D
+    if not isinstance(tensor, torch.Tensor):
+        raise ValueError(f"Expected torch.Tensor, got {type(tensor)}")
+
+    if tensor.ndim != 4:
+        raise ValueError(
+            f"Expected 4D tensor with shape (B, H, W, C), got {tensor.ndim}D tensor"
+        )
+
+    # Take first image from batch
+    if tensor.shape[0] == 0:
+        raise ValueError("Tensor has empty batch dimension (B=0)")
+
+    image_tensor = tensor[0]  # Shape: (H, W, C)
+
+    # Convert from float32 [0, 1] to uint8 [0, 255]
+    # Move to CPU and convert to numpy
+    image_np = (image_tensor.cpu().numpy() * 255.0).astype(np.uint8)
+
+    # Create PIL Image from numpy array
+    try:
+        pil_image = Image.fromarray(image_np)
+    except Exception as e:
+        raise ValueError(f"Failed to create PIL Image from tensor: {e}")
+
+    # Save to BytesIO as PNG
+    img_bytes = BytesIO()
+    try:
+        pil_image.save(img_bytes, format='PNG')
+    except Exception as e:
+        raise ValueError(f"Failed to save image as PNG: {e}")
+
+    # Reset position to beginning
+    img_bytes.seek(0)
+
+    # Set name attribute (required for multipart upload)
+    img_bytes.name = filename
+
+    return img_bytes

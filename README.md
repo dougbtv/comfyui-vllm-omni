@@ -1,21 +1,53 @@
-# ComfyUI-vLLM-Omni Text-to-Image Node
+# ComfyUI-vLLM-Omni
 
 > **⚠️ EXPERIMENTAL PROOF-OF-CONCEPT**
 > This is an experimental integration that relies on experimental features in vLLM-Omni. The image generation API in vLLM-Omni is currently under development and may change. Use this for testing and development purposes only.
 
-A custom ComfyUI node that enables text-to-image generation using **vLLM-Omni's diffusion backend**. This integration allows you to use vLLM-Omni's experimental image generation capabilities (e.g., Qwen-Image) directly within ComfyUI workflows.
+Custom ComfyUI nodes that enable **text-to-image generation** and **image editing** using **vLLM-Omni's diffusion backend**. This integration allows you to use vLLM-Omni's experimental image capabilities (Qwen-Image, Qwen-Image-Edit) directly within ComfyUI workflows.
 
-![Example Generation](example-steampunk-skier.png)
+![Example Generation](docs/images/example-steampunk-skier.png)
 *Example: "telemark skier in the Adirondacks, 1880s clothing, steampunk goggles, action shot, powder skiing, a portrait by Nick Alm"*
 
 ## Features
 
+### Text-to-Image Generation
 - **OpenAI DALL-E Compatible API**: Uses standard API format for easy integration
 - **Full Parameter Control**: Adjust width, height, steps, guidance scale, seed, and more
 - **Negative Prompts**: Guide what NOT to generate
 - **Batch Generation**: Generate multiple images in a single request
+- **Model-Aware Defaults**: Automatically detects server model and adjusts parameters for optimal results
+
+### Image Editing
+- **Edit existing images** with text prompts
+- **Auto size calculation** from input image aspect ratio
+- **Batch variations**: Generate multiple edited versions
+- **Mask support** for future inpainting capabilities
+- **Advanced CFG controls** with dual guidance scales
+
+### General
 - **Async HTTP**: Non-blocking network calls for better performance
 - **ComfyUI Native**: Integrates seamlessly with ComfyUI's node graph system
+- **Flexible server configuration**: Split base URL and endpoint path for easier setup
+
+## Model-Aware Defaults
+
+The node automatically detects which diffusion model is running on the vLLM-Omni server and adjusts default parameters for optimal results:
+
+| Model | Default Steps | Guidance Scale | Best For |
+|-------|--------------|----------------|----------|
+| **Qwen/Qwen-Image** | 50 | 4.0 | High quality, detailed images |
+| **Z-Image-Turbo** | 9 | 0.0 | Fast generation, good quality |
+
+**How it works:**
+- When you leave parameters at their default values, the node queries `/health` to detect the model
+- Model-specific defaults are automatically applied
+- If you manually adjust ANY parameter, your value is always used
+- Old servers without `/health` fall back to Qwen-Image defaults
+
+**Example:** With Z-Image-Turbo server, leaving defaults will use 9 steps (fast).
+With Qwen-Image, defaults remain 50 steps (quality).
+
+No configuration required - it just works!
 
 ## Requirements
 
@@ -94,6 +126,39 @@ Negative: "blurry, low quality, distorted, ugly"
 Positive: "a cute robot reading a book in a cozy library, warm lighting, illustration style"
 Negative: "dark, scary, realistic"
 ```
+
+## Example Workflows
+
+Ready-to-use workflow examples are provided in the `examples/` folder. You can drag and drop these JSON files into ComfyUI to get started quickly.
+
+### Available Examples
+
+1. **`vllm-omni basic t2i.json`** - Basic text-to-image generation
+   - Simple workflow showing the vLLM-Omni Text-to-Image node
+   - Generates: "astronaut riding a horse on the moon"
+   - Uses: Qwen-Image or Z-Image-Turbo model
+
+2. **`vllm-omni image edit.json`** - Image editing workflow
+   - Load an image and edit it with text prompts
+   - Example: "put a tiara on the cat's head"
+   - Shows auto size calculation (width=0, height=0)
+
+   ![Image Edit Workflow](docs/images/image-edit-workflow.png)
+
+3. **`vllm-omni text to image plus edit.json`** - Combined workflow
+   - Generate image with text-to-image, then edit with image edit node
+   - Example: Generate "universe in a bottle" → Edit "add fish swimming"
+   - Shows how to chain both nodes together
+
+   ![Text-to-Image + Edit Workflow](docs/images/text-to-image-and-edit-workflow.png)
+
+### Using the Examples
+
+1. Download or clone this repository
+2. Open ComfyUI
+3. Drag and drop any `.json` file from `examples/` into the ComfyUI window
+4. Adjust the `server_base_url` if your vLLM-Omni server is not on localhost:8000
+5. Queue the workflow!
 
 ## Parameters Reference
 

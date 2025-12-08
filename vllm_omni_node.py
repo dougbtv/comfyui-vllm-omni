@@ -110,11 +110,18 @@ class VLLMTextToImage:
                         "tooltip": "Random seed for reproducibility (0 = random)",
                     },
                 ),
-                "server_url": (
+                "server_base_url": (
                     "STRING",
                     {
-                        "default": "http://localhost:8000/v1/images/generations",
-                        "tooltip": "vLLM-Omni server endpoint URL",
+                        "default": "http://localhost:8000",
+                        "tooltip": "Base URL of vLLM-Omni server (e.g., http://10.14.216.12:8000)",
+                    },
+                ),
+                "endpoint_path": (
+                    "STRING",
+                    {
+                        "default": "/v1/images/generations",
+                        "tooltip": "API endpoint path (usually /v1/images/generations)",
                     },
                 ),
             },
@@ -136,7 +143,8 @@ class VLLMTextToImage:
         guidance_scale: float = 4.0,
         n: int = 1,
         seed: int = 0,
-        server_url: str = "http://localhost:8000/v1/images/generations",
+        server_base_url: str = "http://localhost:8000",
+        endpoint_path: str = "/v1/images/generations",
     ) -> Tuple[torch.Tensor]:
         """
         Main execution method - generates images via vLLM-Omni API.
@@ -166,7 +174,8 @@ class VLLMTextToImage:
             guidance_scale: CFG scale
             n: Number of images to generate
             seed: Random seed
-            server_url: Full URL to vLLM-Omni endpoint
+            server_base_url: Base URL of vLLM-Omni server (e.g., http://localhost:8000)
+            endpoint_path: API endpoint path (default: /v1/images/generations)
 
         Returns:
             Tuple containing a single tensor with shape (n, height, width, 4)
@@ -179,11 +188,31 @@ class VLLMTextToImage:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
+        # Validate and construct full endpoint URL
+        if endpoint_path and not endpoint_path.startswith('/'):
+            endpoint_path = '/' + endpoint_path
+
+        full_endpoint_url = server_base_url.rstrip('/') + endpoint_path
+
         # Create API client
-        client = VLLMOmniClient(server_url)
+        client = VLLMOmniClient(full_endpoint_url)
 
         # Query model-specific defaults
         model_defaults = await client.get_model_defaults()
+
+        # Display detected model information
+        model_name = model_defaults["model_name"]
+        if "unknown" not in model_name.lower() and "fallback" not in model_name.lower():
+            print(f"\n{'='*60}")
+            print(f"vLLM-Omni Server Connected")
+            print(f"{'='*60}")
+            print(f"Model: {model_name}")
+            print(f"Default Steps: {model_defaults['num_inference_steps']}")
+            print(f"Guidance Scale: {model_defaults['guidance_scale']}")
+            print(f"{'='*60}\n")
+        elif "fallback" in model_name.lower():
+            print(f"\n⚠️  vLLM-Omni: Using fallback defaults (server /health unavailable)")
+            print(f"   Using Qwen-Image defaults: 50 steps, guidance 4.0\n")
 
         # Apply model defaults if parameters match UI defaults
         # UI defaults: num_inference_steps=50, guidance_scale=4.0

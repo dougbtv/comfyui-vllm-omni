@@ -13,15 +13,17 @@ To use this node:
 3. Connect it to other nodes (e.g., SaveImage) and generate images!
 """
 
-from .vllm_omni_node import VLLMTextToImage
+from .vllm_omni_node import VLLMTextToImage, VLLMImageEdit
 
 # ComfyUI requires these two dictionaries for node registration
 NODE_CLASS_MAPPINGS = {
     "VLLMTextToImage": VLLMTextToImage,
+    "VLLMImageEdit": VLLMImageEdit,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "VLLMTextToImage": "vLLM-Omni Text-to-Image",
+    "VLLMImageEdit": "vLLM-Omni Image Edit",
 }
 
 __all__ = [

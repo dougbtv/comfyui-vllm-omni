@@ -144,6 +144,19 @@ class VLLMTextToImage:
         Modern ComfyUI supports async node functions natively, so this method
         is async and will be awaited by ComfyUI's execution system.
 
+        Model Awareness:
+        This method implements basic model awareness by querying the server's
+        /health endpoint to detect which model is running and applying appropriate
+        defaults:
+
+        - Qwen/Qwen-Image: 50 steps, guidance 4.0
+        - Z-Image-Turbo: 9 steps, guidance 0.0
+
+        Model defaults are ONLY applied if the parameter matches the UI default.
+        If you manually adjust any parameter, your value is always respected.
+
+        If /health endpoint is unavailable, falls back to Qwen-Image defaults.
+
         Args:
             prompt: Text prompt for image generation
             negative_prompt: Negative prompt (optional)
@@ -169,15 +182,35 @@ class VLLMTextToImage:
         # Create API client
         client = VLLMOmniClient(server_url)
 
+        # Query model-specific defaults
+        model_defaults = await client.get_model_defaults()
+
+        # Apply model defaults if parameters match UI defaults
+        # UI defaults: num_inference_steps=50, guidance_scale=4.0
+        adjusted_steps = num_inference_steps
+        adjusted_guidance = guidance_scale
+
+        if num_inference_steps == 50:  # Matches UI default
+            adjusted_steps = model_defaults["num_inference_steps"]
+            if adjusted_steps != 50:
+                print(f"vLLM-Omni: Using model default steps: {adjusted_steps} "
+                      f"(model: {model_defaults['model_name']})")
+
+        if guidance_scale == 4.0:  # Matches UI default
+            adjusted_guidance = model_defaults["guidance_scale"]
+            if adjusted_guidance != 4.0:
+                print(f"vLLM-Omni: Using model default guidance: {adjusted_guidance} "
+                      f"(model: {model_defaults['model_name']})")
+
         try:
-            # Generate images via API
+            # Generate images via API with adjusted params
             response_data = await client.generate_images(
                 prompt=prompt,
                 negative_prompt=negative_prompt,
                 width=width,
                 height=height,
-                num_inference_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
+                num_inference_steps=adjusted_steps,      # Use adjusted value
+                guidance_scale=adjusted_guidance,         # Use adjusted value
                 n=n,
                 seed=seed,
             )

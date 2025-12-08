@@ -16,6 +16,27 @@ A custom ComfyUI node that enables text-to-image generation using **vLLM-Omni's 
 - **Batch Generation**: Generate multiple images in a single request
 - **Async HTTP**: Non-blocking network calls for better performance
 - **ComfyUI Native**: Integrates seamlessly with ComfyUI's node graph system
+- **Model-Aware Defaults**: Automatically detects server model and adjusts parameters for optimal results
+
+## Model-Aware Defaults
+
+The node automatically detects which diffusion model is running on the vLLM-Omni server and adjusts default parameters for optimal results:
+
+| Model | Default Steps | Guidance Scale | Best For |
+|-------|--------------|----------------|----------|
+| **Qwen/Qwen-Image** | 50 | 4.0 | High quality, detailed images |
+| **Z-Image-Turbo** | 9 | 0.0 | Fast generation, good quality |
+
+**How it works:**
+- When you leave parameters at their default values, the node queries `/health` to detect the model
+- Model-specific defaults are automatically applied
+- If you manually adjust ANY parameter, your value is always used
+- Old servers without `/health` fall back to Qwen-Image defaults
+
+**Example:** With Z-Image-Turbo server, leaving defaults will use 9 steps (fast).
+With Qwen-Image, defaults remain 50 steps (quality).
+
+No configuration required - it just works!
 
 ## Requirements
 

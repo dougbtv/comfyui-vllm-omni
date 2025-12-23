@@ -1,5 +1,11 @@
 # ComfyUI-vLLM-Omni
 
+> **⚠️ UPDATES COMING SOON! **
+> A [DALL-E compatible API was added to vllm-omni](https://github.com/vllm-project/vllm-omni/pull/292)! An official implementation that tracks the official release, coming soon!
+> ...and maybe experimental endpoints as well.
+
+Until then...
+
 > **⚠️ EXPERIMENTAL PROOF-OF-CONCEPT**
 > This is an experimental integration that relies on experimental features in vLLM-Omni. The image generation API in vLLM-Omni is currently under development and may change. Use this for testing and development purposes only.
 

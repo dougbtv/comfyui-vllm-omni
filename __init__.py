@@ -23,7 +23,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "VLLMTextToImage": "vLLM-Omni Text-to-Image",
-    "VLLMImageEdit": "vLLM-Omni Image Edit",
+    "VLLMImageEdit": "vLLM-Omni Image Edit (EXPERIMENTAL)",
 }
 
 __all__ = [

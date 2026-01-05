@@ -125,38 +125,26 @@ Positive: "a cute robot reading a book in a cozy library, warm lighting, illustr
 Negative: "dark, scary, realistic"
 ```
 
-## Example Workflows
+## Example Workflow
 
-Ready-to-use workflow examples are provided in the `examples/` folder. You can drag and drop these JSON files into ComfyUI to get started quickly.
+A ready-to-use workflow example is provided in the `examples/` folder. You can drag and drop this JSON file into ComfyUI to get started quickly.
 
-### Available Examples
+### Available Example
 
-1. **`vllm-omni basic t2i.json`** - Basic text-to-image generation
-   - Simple workflow showing the vLLM-Omni Text-to-Image node
-   - Generates: "astronaut riding a horse on the moon"
-   - Uses: Qwen-Image or Z-Image-Turbo model
+**`vllm-omni-generate.json`** - Basic text-to-image generation
+- Simple workflow demonstrating the vLLM-Omni Text-to-Image node
+- Shows how to connect the node to SaveImage for output
+- Demonstrates model preset selection and parameter configuration
+- Ready to use with Qwen-Image or Z-Image-Turbo server
 
-2. **`vllm-omni image edit.json`** - Image editing workflow
-   - Load an image and edit it with text prompts
-   - Example: "put a tiara on the cat's head"
-   - Shows auto size calculation (width=0, height=0)
-
-   ![Image Edit Workflow](docs/images/image-edit-workflow.png)
-
-3. **`vllm-omni text to image plus edit.json`** - Combined workflow
-   - Generate image with text-to-image, then edit with image edit node
-   - Example: Generate "universe in a bottle" → Edit "add fish swimming"
-   - Shows how to chain both nodes together
-
-   ![Text-to-Image + Edit Workflow](docs/images/text-to-image-and-edit-workflow.png)
-
-### Using the Examples
+### Using the Example
 
 1. Download or clone this repository
 2. Open ComfyUI
-3. Drag and drop any `.json` file from `examples/` into the ComfyUI window
+3. Drag and drop `examples/vllm-omni-generate.json` into the ComfyUI window
 4. Adjust the `server_base_url` if your vLLM-Omni server is not on localhost:8000
-5. Queue the workflow!
+5. Select your model preset (or use "Server Default (Recommended)")
+6. Queue the workflow!
 
 ## Parameters Reference
 

@@ -30,98 +30,19 @@ class VLLMOmniClient:
         self.base_url = base_url
         self.timeout = aiohttp.ClientTimeout(total=timeout)
 
-        # Cache for health endpoint data (model-aware defaults)
-        self._health_cache: Optional[Dict[str, Any]] = None
-        self._health_checked: bool = False
-
-    async def get_health(self) -> Optional[Dict[str, Any]]:
-        """
-        Query /health endpoint to detect model and profile.
-
-        Returns model info with profile (default_steps, max_steps) or None if unavailable.
-        Results are cached to avoid repeated calls.
-        """
-        if self._health_checked:
-            return self._health_cache
-
-        self._health_checked = True
-
-        # Parse base_url to construct health URL
-        try:
-            from urllib.parse import urlparse, urlunparse
-            parsed = urlparse(self.base_url)
-            health_url = urlunparse((parsed.scheme, parsed.netloc, '/health', '', '', ''))
-        except Exception as e:
-            print(f"Warning: Failed to parse base_url for health check: {e}")
-            return None
-
-        # Query /health with 5-second timeout
-        health_timeout = aiohttp.ClientTimeout(total=5.0)
-
-        async with aiohttp.ClientSession(timeout=health_timeout) as session:
-            try:
-                async with session.get(health_url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        self._health_cache = data
-                        return data
-                    else:
-                        print(f"Warning: /health returned status {response.status}")
-                        return None
-            except Exception as e:
-                # Fail silently - server may not support /health
-                print(f"Warning: Health check failed (server may not support /health): {e}")
-                return None
-
-    async def get_model_defaults(self) -> Dict[str, Any]:
-        """
-        Get model-specific parameter defaults from health endpoint.
-
-        Returns:
-            Dict with keys:
-                - num_inference_steps: int
-                - guidance_scale: float
-                - model_name: str
-
-        Fallback (if /health unavailable):
-            Returns Qwen-Image defaults: steps=50, guidance=4.0
-        """
-        health_info = await self.get_health()
-
-        if health_info is None:
-            # Fallback to Qwen-Image defaults
-            return {
-                "num_inference_steps": 50,
-                "guidance_scale": 4.0,
-                "model_name": "unknown (fallback)",
-            }
-
-        profile = health_info.get("profile", {})
-        model_name = health_info.get("model", "unknown")
-        default_steps = profile.get("default_steps", 50)
-
-        # Z-Image-Turbo forces guidance_scale to 0.0
-        if "z-image-turbo" in model_name.lower():
-            guidance_scale = 0.0
-        else:
-            guidance_scale = 4.0
-
-        return {
-            "num_inference_steps": default_steps,
-            "guidance_scale": guidance_scale,
-            "model_name": model_name,
-        }
-
     async def generate_images(
         self,
         prompt: str,
         negative_prompt: str = "",
         width: int = 1024,
         height: int = 1024,
-        num_inference_steps: int = 50,
-        guidance_scale: float = 4.0,
+        num_inference_steps: int = -1,
+        guidance_scale: float = -1.0,
+        true_cfg_scale: float = -1.0,
         n: int = 1,
         seed: int = 0,
+        vae_use_slicing: bool = False,
+        vae_use_tiling: bool = False,
     ) -> Dict[str, Any]:
         """
         Generate images via vLLM-Omni API.
@@ -129,15 +50,21 @@ class VLLMOmniClient:
         This method accepts ComfyUI-style parameters (width, height) and converts
         them to OpenAI DALL-E format (size string) for the API request.
 
+        Parameters set to sentinel values (-1 for int, -1.0 for float) will be
+        omitted from the API request, allowing the server to use its own defaults.
+
         Args:
             prompt: Text prompt for image generation
-            negative_prompt: Negative prompt (optional)
+            negative_prompt: Negative prompt (optional, omitted if empty)
             width: Image width in pixels
             height: Image height in pixels
-            num_inference_steps: Number of denoising steps
-            guidance_scale: CFG scale (classifier-free guidance)
+            num_inference_steps: Number of denoising steps (-1 = server default)
+            guidance_scale: CFG scale (-1.0 = server default)
+            true_cfg_scale: True CFG scale for advanced control (-1.0 = server default)
             n: Number of images to generate
-            seed: Random seed (0 for random)
+            seed: Random seed (0 = random)
+            vae_use_slicing: Enable VAE slicing for memory optimization
+            vae_use_tiling: Enable VAE tiling for large images
 
         Returns:
             Dict containing API response with 'data' array and 'created' timestamp
@@ -149,16 +76,30 @@ class VLLMOmniClient:
         # Convert width/height to OpenAI size format
         size = f"{width}x{height}"
 
-        # Build OpenAI DALL-E compatible request
+        # Build base request (always included)
         request_data = {
             "prompt": prompt,
             "n": n,
             "size": size,
             "response_format": "b64_json",
-            "negative_prompt": negative_prompt,
-            "num_inference_steps": num_inference_steps,
-            "guidance_scale": guidance_scale,
         }
+
+        # Only add optional parameters if not at sentinel value or non-empty
+        if negative_prompt:
+            request_data["negative_prompt"] = negative_prompt
+
+        if num_inference_steps != -1:
+            request_data["num_inference_steps"] = num_inference_steps
+
+        if guidance_scale != -1.0:
+            request_data["guidance_scale"] = guidance_scale
+
+        if true_cfg_scale != -1.0:
+            request_data["true_cfg_scale"] = true_cfg_scale
+
+        # VAE params always sent (booleans, no sentinel concept)
+        request_data["vae_use_slicing"] = vae_use_slicing
+        request_data["vae_use_tiling"] = vae_use_tiling
 
         # Only include seed if non-zero (0 means random)
         if seed != 0:

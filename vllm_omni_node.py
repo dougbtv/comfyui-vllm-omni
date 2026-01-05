@@ -12,6 +12,31 @@ from .vllm_api import VLLMOmniClient
 from .utils import base64_to_image_tensor, image_tensor_to_png_bytes
 
 
+# Model preset definitions for common vLLM-Omni diffusion models
+MODEL_PRESETS = {
+    "Server Default (Recommended)": {
+        "num_inference_steps": -1,
+        "guidance_scale": -1.0,
+        "true_cfg_scale": -1.0,
+    },
+    "Qwen-Image (Quality)": {
+        "num_inference_steps": 50,
+        "guidance_scale": 4.0,
+        "true_cfg_scale": -1.0,
+    },
+    "Z-Image-Turbo (Speed)": {
+        "num_inference_steps": 9,
+        "guidance_scale": 0.0,
+        "true_cfg_scale": -1.0,
+    },
+    "Custom": {
+        "num_inference_steps": -1,
+        "guidance_scale": -1.0,
+        "true_cfg_scale": -1.0,
+    },
+}
+
+
 class VLLMTextToImage:
     """
     ComfyUI node for generating images using vLLM-Omni's diffusion backend.
@@ -42,6 +67,13 @@ class VLLMTextToImage:
                 ),
             },
             "optional": {
+                "model_preset": (
+                    list(MODEL_PRESETS.keys()),
+                    {
+                        "default": "Server Default (Recommended)",
+                        "tooltip": "Quick presets for common models. Select 'Custom' to manually configure all parameters.",
+                    },
+                ),
                 "negative_prompt": (
                     "STRING",
                     {
@@ -73,21 +105,31 @@ class VLLMTextToImage:
                 "num_inference_steps": (
                     "INT",
                     {
-                        "default": 50,
-                        "min": 1,
+                        "default": -1,
+                        "min": -1,
                         "max": 200,
                         "step": 1,
-                        "tooltip": "Number of denoising steps (higher = better quality, slower)",
+                        "tooltip": "Number of denoising steps (higher = better quality, slower). -1 = use server default",
                     },
                 ),
                 "guidance_scale": (
                     "FLOAT",
                     {
-                        "default": 4.0,
-                        "min": 0.0,
+                        "default": -1.0,
+                        "min": -1.0,
                         "max": 20.0,
                         "step": 0.5,
-                        "tooltip": "Classifier-free guidance scale (higher = more prompt adherence)",
+                        "tooltip": "Classifier-free guidance scale (higher = more prompt adherence). -1.0 = use server default",
+                    },
+                ),
+                "true_cfg_scale": (
+                    "FLOAT",
+                    {
+                        "default": -1.0,
+                        "min": -1.0,
+                        "max": 20.0,
+                        "step": 0.5,
+                        "tooltip": "True CFG scale for advanced control (model-specific). -1.0 = use server default",
                     },
                 ),
                 "n": (
@@ -108,6 +150,20 @@ class VLLMTextToImage:
                         "max": 2**31 - 1,
                         "step": 1,
                         "tooltip": "Random seed for reproducibility (0 = random)",
+                    },
+                ),
+                "vae_use_slicing": (
+                    ["disabled", "enabled"],
+                    {
+                        "default": "disabled",
+                        "tooltip": "Enable VAE slicing for reduced memory usage (slight quality trade-off)",
+                    },
+                ),
+                "vae_use_tiling": (
+                    ["disabled", "enabled"],
+                    {
+                        "default": "disabled",
+                        "tooltip": "Enable VAE tiling for very large images (reduces memory at cost of artifacts)",
                     },
                 ),
                 "server_base_url": (
@@ -136,13 +192,17 @@ class VLLMTextToImage:
     async def generate(
         self,
         prompt: str,
+        model_preset: str = "Server Default (Recommended)",
         negative_prompt: str = "",
         width: int = 1024,
         height: int = 1024,
-        num_inference_steps: int = 50,
-        guidance_scale: float = 4.0,
+        num_inference_steps: int = -1,
+        guidance_scale: float = -1.0,
+        true_cfg_scale: float = -1.0,
         n: int = 1,
         seed: int = 0,
+        vae_use_slicing: str = "disabled",
+        vae_use_tiling: str = "disabled",
         server_base_url: str = "http://localhost:8000",
         endpoint_path: str = "/v1/images/generations",
     ) -> Tuple[torch.Tensor]:
@@ -152,28 +212,24 @@ class VLLMTextToImage:
         Modern ComfyUI supports async node functions natively, so this method
         is async and will be awaited by ComfyUI's execution system.
 
-        Model Awareness:
-        This method implements basic model awareness by querying the server's
-        /health endpoint to detect which model is running and applying appropriate
-        defaults:
-
-        - Qwen/Qwen-Image: 50 steps, guidance 4.0
-        - Z-Image-Turbo: 9 steps, guidance 0.0
-
-        Model defaults are ONLY applied if the parameter matches the UI default.
-        If you manually adjust any parameter, your value is always respected.
-
-        If /health endpoint is unavailable, falls back to Qwen-Image defaults.
+        Model Presets:
+        This method applies model-specific defaults when a preset is selected.
+        Presets only override parameters still at sentinel values (-1/-1.0).
+        Manual adjustments always take precedence.
 
         Args:
             prompt: Text prompt for image generation
+            model_preset: Quick preset for common models
             negative_prompt: Negative prompt (optional)
             width: Image width in pixels
             height: Image height in pixels
-            num_inference_steps: Number of denoising steps
-            guidance_scale: CFG scale
+            num_inference_steps: Number of denoising steps (-1 = server default)
+            guidance_scale: CFG scale (-1.0 = server default)
+            true_cfg_scale: True CFG scale for advanced control (-1.0 = server default)
             n: Number of images to generate
-            seed: Random seed
+            seed: Random seed (0 = random)
+            vae_use_slicing: Enable VAE slicing for memory optimization
+            vae_use_tiling: Enable VAE tiling for large images
             server_base_url: Base URL of vLLM-Omni server (e.g., http://localhost:8000)
             endpoint_path: API endpoint path (default: /v1/images/generations)
 
@@ -194,54 +250,42 @@ class VLLMTextToImage:
 
         full_endpoint_url = server_base_url.rstrip('/') + endpoint_path
 
+        # Apply model preset if not "Custom"
+        if model_preset != "Custom":
+            preset = MODEL_PRESETS[model_preset]
+            # Only override parameters still at sentinel values
+            if num_inference_steps == -1:
+                num_inference_steps = preset["num_inference_steps"]
+            if guidance_scale == -1.0:
+                guidance_scale = preset["guidance_scale"]
+            if true_cfg_scale == -1.0:
+                true_cfg_scale = preset["true_cfg_scale"]
+
+            # Log preset application
+            if model_preset != "Server Default (Recommended)":
+                print(f"\nvLLM-Omni: Applied preset '{model_preset}'")
+
+        # Convert VAE string parameters to boolean
+        vae_slicing_bool = (vae_use_slicing == "enabled")
+        vae_tiling_bool = (vae_use_tiling == "enabled")
+
         # Create API client
         client = VLLMOmniClient(full_endpoint_url)
 
-        # Query model-specific defaults
-        model_defaults = await client.get_model_defaults()
-
-        # Display detected model information
-        model_name = model_defaults["model_name"]
-        if "unknown" not in model_name.lower() and "fallback" not in model_name.lower():
-            print(f"\n{'='*60}")
-            print(f"vLLM-Omni Server Connected")
-            print(f"{'='*60}")
-            print(f"Model: {model_name}")
-            print(f"Default Steps: {model_defaults['num_inference_steps']}")
-            print(f"Guidance Scale: {model_defaults['guidance_scale']}")
-            print(f"{'='*60}\n")
-        elif "fallback" in model_name.lower():
-            print(f"\n⚠️  vLLM-Omni: Using fallback defaults (server /health unavailable)")
-            print(f"   Using Qwen-Image defaults: 50 steps, guidance 4.0\n")
-
-        # Apply model defaults if parameters match UI defaults
-        # UI defaults: num_inference_steps=50, guidance_scale=4.0
-        adjusted_steps = num_inference_steps
-        adjusted_guidance = guidance_scale
-
-        if num_inference_steps == 50:  # Matches UI default
-            adjusted_steps = model_defaults["num_inference_steps"]
-            if adjusted_steps != 50:
-                print(f"vLLM-Omni: Using model default steps: {adjusted_steps} "
-                      f"(model: {model_defaults['model_name']})")
-
-        if guidance_scale == 4.0:  # Matches UI default
-            adjusted_guidance = model_defaults["guidance_scale"]
-            if adjusted_guidance != 4.0:
-                print(f"vLLM-Omni: Using model default guidance: {adjusted_guidance} "
-                      f"(model: {model_defaults['model_name']})")
-
         try:
-            # Generate images via API with adjusted params
+            # Generate images via API
             response_data = await client.generate_images(
                 prompt=prompt,
                 negative_prompt=negative_prompt,
                 width=width,
                 height=height,
-                num_inference_steps=adjusted_steps,      # Use adjusted value
-                guidance_scale=adjusted_guidance,         # Use adjusted value
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                true_cfg_scale=true_cfg_scale,
                 n=n,
                 seed=seed,
+                vae_use_slicing=vae_slicing_bool,
+                vae_use_tiling=vae_tiling_bool,
             )
 
             # Extract and convert images from response
@@ -405,7 +449,11 @@ class VLLMImageEdit:
     RETURN_NAMES = ("edited_image",)
     FUNCTION = "edit"
     CATEGORY = "image/editing/vllm-omni"
-    DESCRIPTION = "Edit images using vLLM-Omni's image editing models (Qwen-Image-Edit)"
+    DESCRIPTION = (
+        "⚠️ EXPERIMENTAL: Edit images using vLLM-Omni's image editing models. "
+        "This node uses the /v1/images/edits endpoint which is not yet part of the "
+        "official vLLM-Omni API. It may change or be removed. Use for testing only."
+    )
 
     async def edit(
         self,
@@ -451,6 +499,18 @@ class VLLMImageEdit:
             ValueError: If prompt is empty, size parameters invalid, or image conversion fails
             RuntimeError: If editing fails
         """
+        # One-time experimental warning
+        if not hasattr(self, '_warned'):
+            print("\n" + "="*70)
+            print("⚠️  EXPERIMENTAL FEATURE WARNING")
+            print("="*70)
+            print("You are using the vLLM-Omni Image Edit node, which uses an")
+            print("EXPERIMENTAL endpoint (/v1/images/edits) not yet in official API.")
+            print("This feature may change or be removed in future versions.")
+            print("For production use, consider the Text-to-Image node instead.")
+            print("="*70 + "\n")
+            self._warned = True
+
         # Validate prompt
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")

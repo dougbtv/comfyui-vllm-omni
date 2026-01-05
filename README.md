@@ -1,15 +1,8 @@
 # ComfyUI-vLLM-Omni
 
-> **⚠️ UPDATES COMING SOON! **
-> A [DALL-E compatible API was added to vllm-omni](https://github.com/vllm-project/vllm-omni/pull/292)! An official implementation that tracks the official release, coming soon!
-> ...and maybe experimental endpoints as well.
+**Official reference implementation** for ComfyUI integration with vLLM-Omni's DALL-E compatible image generation API.
 
-Until then...
-
-> **⚠️ EXPERIMENTAL PROOF-OF-CONCEPT**
-> This is an experimental integration that relies on experimental features in vLLM-Omni. The image generation API in vLLM-Omni is currently under development and may change. Use this for testing and development purposes only.
-
-Custom ComfyUI nodes that enable **text-to-image generation** and **image editing** using **vLLM-Omni's diffusion backend**. This integration allows you to use vLLM-Omni's experimental image capabilities (Qwen-Image, Qwen-Image-Edit) directly within ComfyUI workflows.
+Custom ComfyUI nodes that enable **text-to-image generation** and **image editing** using **vLLM-Omni's official diffusion API**. This integration allows you to use vLLM-Omni's image capabilities (Qwen-Image, Z-Image-Turbo, etc.) directly within ComfyUI workflows.
 
 ![Example Generation](docs/images/example-steampunk-skier.png)
 *Example: "telemark skier in the Adirondacks, 1880s clothing, steampunk goggles, action shot, powder skiing, a portrait by Nick Alm"*
@@ -17,11 +10,13 @@ Custom ComfyUI nodes that enable **text-to-image generation** and **image editin
 ## Features
 
 ### Text-to-Image Generation
-- **OpenAI DALL-E Compatible API**: Uses standard API format for easy integration
-- **Full Parameter Control**: Adjust width, height, steps, guidance scale, seed, and more
+- **Official vLLM-Omni DALL-E API**: Uses the official OpenAI-compatible API
+- **Model Presets**: Quick-select optimal settings for Qwen-Image, Z-Image-Turbo, and more
+- **Server Defaults**: Use -1 for parameters to let server choose optimal values
+- **Advanced Parameters**: true_cfg_scale, VAE slicing/tiling for memory optimization
+- **Full Parameter Control**: Adjust width, height, steps, guidance scale, seed
 - **Negative Prompts**: Guide what NOT to generate
 - **Batch Generation**: Generate multiple images in a single request
-- **Model-Aware Defaults**: Automatically detects server model and adjusts parameters for optimal results
 
 ### Image Editing
 - **Edit existing images** with text prompts
@@ -35,34 +30,32 @@ Custom ComfyUI nodes that enable **text-to-image generation** and **image editin
 - **ComfyUI Native**: Integrates seamlessly with ComfyUI's node graph system
 - **Flexible server configuration**: Split base URL and endpoint path for easier setup
 
-## Model-Aware Defaults
+## Model Presets
 
-The node automatically detects which diffusion model is running on the vLLM-Omni server and adjusts default parameters for optimal results:
+The node includes built-in presets for popular vLLM-Omni diffusion models:
 
-| Model | Default Steps | Guidance Scale | Best For |
-|-------|--------------|----------------|----------|
-| **Qwen/Qwen-Image** | 50 | 4.0 | High quality, detailed images |
-| **Z-Image-Turbo** | 9 | 0.0 | Fast generation, good quality |
+| Preset | Inference Steps | Guidance Scale | Best For |
+|--------|----------------|----------------|----------|
+| **Server Default (Recommended)** | server default | server default | Let server decide (safest option) |
+| **Qwen-Image (Quality)** | 50 | 4.0 | High quality, detailed images |
+| **Z-Image-Turbo (Speed)** | 9 | 0.0 | Fast generation, good quality |
+| **Custom** | manual | manual | Full manual control |
 
 **How it works:**
-- When you leave parameters at their default values, the node queries `/health` to detect the model
-- Model-specific defaults are automatically applied
-- If you manually adjust ANY parameter, your value is always used
-- Old servers without `/health` fall back to Qwen-Image defaults
+- Select a preset from the dropdown to auto-populate parameters
+- Presets only affect parameters still at default (-1 = server default)
+- Manual adjustments override preset values
+- "Server Default" relies on server-side model configuration (safest, always works)
 
-**Example:** With Z-Image-Turbo server, leaving defaults will use 9 steps (fast).
-With Qwen-Image, defaults remain 50 steps (quality).
-
-No configuration required - it just works!
+**Example:** Select "Z-Image-Turbo" → steps auto-set to 9, guidance to 0.0
 
 ## Requirements
 
 - **ComfyUI** installed and running
 - **Python 3.9+**
-- **vLLM-Omni** with **experimental** image generation server support
-  - ⚠️ Requires vLLM-Omni with the experimental image generation endpoint
-  - The image server implementation is not yet part of the official vLLM-Omni release
-  - See `serverside-implementation.md` for details on the server-side requirements
+- **vLLM-Omni** with official image generation API support
+  - Install: `pip install vllm-omni` (0.6.0+)
+  - Or build from source: [vLLM-Omni GitHub](https://github.com/vllm-project/vllm-omni)
 - Dependencies (most already included with ComfyUI):
   - `aiohttp>=3.8.0`
   - `torch>=2.0.0`
@@ -84,18 +77,17 @@ pip install -r requirements.txt
 
 ### Step 2: Start vLLM-Omni Image Server
 
-> **⚠️ EXPERIMENTAL:** The vLLM-Omni image generation server is an experimental feature. The API endpoint may not be available in official vLLM-Omni releases yet. See `serverside-implementation.md` for implementation details.
-
-You need a running vLLM-Omni server with image generation support. Start it with:
+You need a running vLLM-Omni server with image generation support:
 
 ```bash
-python -m vllm_omni.entrypoints.openai.serving_image \
-  --model Qwen/Qwen-Image \
-  --port 8000 \
-  --host 0.0.0.0
+# Qwen-Image (quality)
+vllm serve Qwen/Qwen-Image --omni --port 8000
+
+# Z-Image-Turbo (speed)
+vllm serve Tongyi-MAI/Z-Image-Turbo --omni --port 8000
 ```
 
-**Note:** Adjust the model path and port as needed. The default server URL in the node is `http://localhost:8000/v1/images/generations`.
+**Note:** The default server URL in the node is `http://localhost:8000/v1/images/generations`.
 
 ### Step 3: Restart ComfyUI
 
@@ -133,52 +125,45 @@ Positive: "a cute robot reading a book in a cozy library, warm lighting, illustr
 Negative: "dark, scary, realistic"
 ```
 
-## Example Workflows
+## Example Workflow
 
-Ready-to-use workflow examples are provided in the `examples/` folder. You can drag and drop these JSON files into ComfyUI to get started quickly.
+A ready-to-use workflow example is provided in the `examples/` folder. You can drag and drop this JSON file into ComfyUI to get started quickly.
 
-### Available Examples
+### Available Example
 
-1. **`vllm-omni basic t2i.json`** - Basic text-to-image generation
-   - Simple workflow showing the vLLM-Omni Text-to-Image node
-   - Generates: "astronaut riding a horse on the moon"
-   - Uses: Qwen-Image or Z-Image-Turbo model
+**`vllm-omni-generate.json`** - Basic text-to-image generation
+- Simple workflow demonstrating the vLLM-Omni Text-to-Image node
+- Shows how to connect the node to SaveImage for output
+- Demonstrates model preset selection and parameter configuration
+- Ready to use with Qwen-Image or Z-Image-Turbo server
 
-2. **`vllm-omni image edit.json`** - Image editing workflow
-   - Load an image and edit it with text prompts
-   - Example: "put a tiara on the cat's head"
-   - Shows auto size calculation (width=0, height=0)
-
-   ![Image Edit Workflow](docs/images/image-edit-workflow.png)
-
-3. **`vllm-omni text to image plus edit.json`** - Combined workflow
-   - Generate image with text-to-image, then edit with image edit node
-   - Example: Generate "universe in a bottle" → Edit "add fish swimming"
-   - Shows how to chain both nodes together
-
-   ![Text-to-Image + Edit Workflow](docs/images/text-to-image-and-edit-workflow.png)
-
-### Using the Examples
+### Using the Example
 
 1. Download or clone this repository
 2. Open ComfyUI
-3. Drag and drop any `.json` file from `examples/` into the ComfyUI window
+3. Drag and drop `examples/vllm-omni-generate.json` into the ComfyUI window
 4. Adjust the `server_base_url` if your vLLM-Omni server is not on localhost:8000
-5. Queue the workflow!
+5. Select your model preset (or use "Server Default (Recommended)")
+6. Queue the workflow!
 
 ## Parameters Reference
 
 | Parameter | Type | Default | Range | Description |
 |-----------|------|---------|-------|-------------|
 | **prompt** | STRING | "" | - | Text description of image to generate (required) |
+| **model_preset** | CHOICE | Server Default | - | Quick preset selector for common models |
 | **negative_prompt** | STRING | "" | - | What NOT to generate (optional) |
 | **width** | INT | 1024 | 256-2048 | Image width in pixels (step: 64) |
 | **height** | INT | 1024 | 256-2048 | Image height in pixels (step: 64) |
-| **num_inference_steps** | INT | 50 | 1-200 | Number of denoising steps (higher = better quality, slower) |
-| **guidance_scale** | FLOAT | 4.0 | 0.0-20.0 | CFG scale (higher = more prompt adherence) |
+| **num_inference_steps** | INT | -1 | -1-200 | Number of denoising steps. -1 = use server default |
+| **guidance_scale** | FLOAT | -1.0 | -1.0-20.0 | CFG scale (higher = more prompt adherence). -1.0 = use server default |
+| **true_cfg_scale** | FLOAT | -1.0 | -1.0-20.0 | Advanced CFG control (model-specific). -1.0 = use server default |
 | **n** | INT | 1 | 1-10 | Number of images to generate |
 | **seed** | INT | 0 | 0-2³¹ | Random seed (0 = random) |
-| **server_url** | STRING | http://localhost:8000/... | - | vLLM-Omni API endpoint |
+| **vae_use_slicing** | CHOICE | disabled | disabled/enabled | Enable VAE slicing for memory optimization |
+| **vae_use_tiling** | CHOICE | disabled | disabled/enabled | Enable VAE tiling for very large images |
+| **server_base_url** | STRING | http://localhost:8000 | - | Base URL of vLLM-Omni server |
+| **endpoint_path** | STRING | /v1/images/generations | - | API endpoint path |
 
 ## API Format
 
@@ -196,6 +181,9 @@ POST /v1/images/generations
   "negative_prompt": "",
   "num_inference_steps": 50,
   "guidance_scale": 4.0,
+  "true_cfg_scale": 4.0,
+  "vae_use_slicing": false,
+  "vae_use_tiling": false,
   "seed": 42
 }
 ```
@@ -213,7 +201,9 @@ POST /v1/images/generations
 }
 ```
 
-**Note:** The node automatically converts ComfyUI's separate width/height parameters to the OpenAI `size` format ("WIDTHxHEIGHT").
+**Notes:**
+- The node automatically converts ComfyUI's separate width/height parameters to the OpenAI `size` format ("WIDTHxHEIGHT")
+- Parameters set to sentinel values (-1/-1.0) are omitted from the request, allowing the server to use its own defaults
 
 ## Troubleshooting
 
@@ -289,6 +279,22 @@ seed: 0  → Random seed each time = different images
 
 Set `n` to generate multiple variations at once. The output will be a batch of images that you can process individually using ComfyUI's batch processing nodes.
 
+## Experimental Features
+
+### Image Editing (Experimental)
+
+The **vLLM-Omni Image Edit** node is marked as **EXPERIMENTAL** because:
+- It uses the `/v1/images/edits` endpoint
+- This endpoint is not yet part of the official vLLM-Omni API
+- It may change or be removed in future releases
+
+**Current Status:**
+- ✅ Works with current experimental vLLM-Omni builds
+- ⚠️ Not guaranteed to be stable across versions
+- 🔮 May become official in future releases
+
+**Recommendation:** For production workflows, use the official Text-to-Image node instead.
+
 ## Architecture
 
 ```
@@ -348,16 +354,12 @@ Contributions are welcome! Please:
 
 ## Known Limitations
 
-This is a **Proof-of-Concept (PoC)** implementation with the following limitations:
-
-1. **⚠️ Experimental vLLM-Omni API**: Relies on experimental image generation features in vLLM-Omni that are under active development and subject to change
+1. **Image Edit Endpoint**: The `/v1/images/edits` endpoint is experimental (see Experimental Features section)
 2. **Async Generation Only**: Requires modern ComfyUI with async node support
 3. **Single Server**: No automatic load balancing or failover
 4. **No Progress Bar**: No real-time progress updates during generation
 5. **Base64 Only**: No direct file URL support (would require image hosting)
 6. **No Authentication**: Assumes open localhost server
-
-These may be addressed in future versions as vLLM-Omni's image generation capabilities mature.
 
 ## Future Enhancements
 
